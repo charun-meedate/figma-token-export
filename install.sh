@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-# Installs this repo's skills into a project (or the current user).
+# Installs this repo's skill into a project (or the current user).
 #
-#   ./install.sh ~/dev/my-project                    all skills -> <project>/.claude/skills/
-#   ./install.sh ~/dev/my-project --skill figma-rename   just one
-#   ./install.sh ~/dev/my-project --link             symlink instead of copying
-#   ./install.sh --global                            install into ~/.claude/skills/
-#   ./install.sh --list                              show what this repo ships
+#   ./install.sh ~/dev/my-project          copy into <project>/.claude/skills/
+#   ./install.sh ~/dev/my-project --link   symlink instead of copying
+#   ./install.sh --global                  install into ~/.claude/skills/
+#   ./install.sh --list                    show what this repo ships
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILLS_DIR="$REPO_DIR/skills"
 
 usage() {
-  sed -n '2,8p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,7p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
@@ -24,7 +23,6 @@ available_skills() {
 
 LINK=false
 TARGET_ROOT=""
-SELECTED=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -34,11 +32,6 @@ while [[ $# -gt 0 ]]; do
       echo "Skills in this repo:"
       available_skills | sed 's/^/  /'
       exit 0
-      ;;
-    --skill)
-      [[ $# -ge 2 ]] || { echo "Error: --skill needs a name." >&2; exit 1; }
-      SELECTED+=("$2")
-      shift
       ;;
     -h|--help) usage 0 ;;
     -*) echo "Unknown option: $1" >&2; usage 1 ;;
@@ -56,21 +49,11 @@ if [[ ! -d "$TARGET_ROOT" ]]; then
   exit 1
 fi
 
-if [[ ${#SELECTED[@]} -eq 0 ]]; then
-  while IFS= read -r name; do SELECTED+=("$name"); done < <(available_skills)
-fi
-
 DEST_DIR="$TARGET_ROOT/.claude/skills"
 mkdir -p "$DEST_DIR"
 
-for SKILL_NAME in "${SELECTED[@]}"; do
+for SKILL_NAME in $(available_skills); do
   SRC="$SKILLS_DIR/$SKILL_NAME"
-  if [[ ! -d "$SRC" ]]; then
-    echo "Error: no skill called \"$SKILL_NAME\" in $SKILLS_DIR. Available:" >&2
-    available_skills | sed 's/^/  /' >&2
-    exit 1
-  fi
-
   DEST="$DEST_DIR/$SKILL_NAME"
 
   # Report what is being replaced before replacing it — an existing skill may
@@ -100,14 +83,11 @@ for SKILL_NAME in "${SELECTED[@]}"; do
   fi
 done
 
-echo
-echo "Installed: ${SELECTED[*]}"
 cat <<EOF
 
 Next:
-  export tokens   cp "$DEST_DIR/figma-token-export/scripts/tokens.config.example.json" "$TARGET_ROOT/tokens.config.json"
-  rename things   cp "$DEST_DIR/figma-rename/scripts/rename.config.example.json" "$TARGET_ROOT/rename.config.json"
+  cp "$DEST_DIR/figma-token-export/scripts/tokens.config.example.json" "$TARGET_ROOT/tokens.config.json"
 
-Edit the file you copied, then ask for the job in Claude Code (or run
-/figma-token-export, /figma-rename).
+Edit that file — pick the targets and the Figma file key — then ask for the
+export in Claude Code (or run /figma-token-export).
 EOF
