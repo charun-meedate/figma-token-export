@@ -1,0 +1,21 @@
+{
+  "id": "eval-01-first-export",
+  "skill": "figma-token-export",
+  "tests": "Step 0–4 · ตั้งโปรเจกต์ใหม่ตั้งแต่ศูนย์",
+  "query": "export token ให้หน่อย https://www.figma.com/design/SjE7hLqGcKYLy4XMgXGhlM/-VD--Design-system----Rizzup--Copy-?node-id=59-862",
+  "files": [
+    "โปรเจกต์เปล่า ไม่มี tokens.config.json",
+    "ลิงก์ที่ให้ชี้ไปหน้า cover (node 59:862) ซึ่งไม่มี variable ผูกอยู่เลย",
+    "MCP get_metadata ของไฟล์นี้ list page ได้แค่หน้า cover ทั้งที่มี 40 หน้า"
+  ],
+  "expected_behavior": [
+    "ตรวจว่า node ที่ให้มาไม่มี token แล้วบอกออกมา แทนที่จะรายงานว่า export ได้ 0 token",
+    "ไม่สรุปว่าไฟล์ไม่มี token เพราะ get_metadata list ไม่ครบ — ไป list หน้าด้วย REST /v1/files/:key?depth=1 แทน",
+    "ส่ง node id ระดับ frame ให้ get_variable_defs ไม่ใช่ id ของ canvas/page",
+    "ถามผู้ใช้เรื่อง mode ก่อนเริ่มดึง และรอคำตอบ",
+    "เซฟผลดิบเป็น dumps/<ชื่อ>.json หนึ่งไฟล์ต่อหนึ่งเฟรม แล้วบอกว่าให้ commit ไว้",
+    "รัน verify ก่อน generate และอ่านรายการใน other ออกมาว่าอันไหนเป็นชิ้นส่วนที่ composite กินไป อันไหนน่าสงสัย",
+    "ระบุจำนวน token ต่อกลุ่ม และบอกว่า page ไหนยังไม่มี dump"
+  ],
+  "baseline_failure": "เรียก get_variable_defs ด้วย node 59:862 ได้ error 'nothing selected' แล้วสรุปว่าดึงไม่ได้ หรือไม่ก็เดา node id เอง แล้วรายงานว่า export สำเร็จโดยได้แค่ชุดที่บังเอิญเจอ"
+}

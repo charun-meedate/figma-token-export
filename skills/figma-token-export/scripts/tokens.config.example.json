@@ -1,0 +1,64 @@
+{
+  "$comment": "Copy to your project root as tokens.config.json. All paths are relative to this file.",
+
+  "figma": {
+    "fileKey": "REPLACE_WITH_FILE_KEY",
+    "$comment": "fileKey is the segment after /design/ in the Figma URL.",
+
+    "mcp": {
+      "$comment": "Node ids to run get_variable_defs against. Coverage is per-node, so list every frame that together binds all tokens (usually the Foundations pages).",
+      "nodes": ["0:1"]
+    },
+
+    "rest": {
+      "$comment": "Fallback path. `styles` reads published FILL/TEXT styles. `scrape` is only for files that document tokens as canvas artefacts.",
+      "styles": true,
+      "keepRaw": false,
+      "scrape": []
+    }
+  },
+
+  "tokensPath": "tokens/tokens.json",
+  "rawDir": "build/figma-raw",
+
+  "layers": {
+    "$comment": "Optional. Maps token-name globs to the layers of the design system, usually mirroring the Figma variable collections (1. Primitive / 2. Alias / 3. Semantic). First match wins, so list the most specific first. Run `node scripts/verify.mjs` to see which namespaces actually exist before writing these.",
+    "component": ["component/**", "button/**", "input/**"],
+    "semantic": ["text/**", "surface/**", "border/**", "icon/**", "background/**"],
+    "primitive": ["color/**", "spacing/**", "radius/**", "border-width/**"]
+  },
+
+  "targets": [
+    {
+      "type": "flutter",
+      "out": "packages/design_system/lib/src/tokens",
+      "prefix": "App",
+      "groupColorsByNamespace": false,
+      "fontFamily": null,
+      "fontPackage": null,
+      "$comment": "Omit `layers` to export everything. A product app usually wants only the semantic layer.",
+      "layers": ["semantic"]
+    },
+    {
+      "type": "web",
+      "out": "src/tokens",
+      "cssPrefix": "",
+      "dimensionUnit": "px",
+      "remBase": 16,
+      "react": false,
+      "typographyClasses": true,
+      "exclude": ["**/deprecated/**"],
+
+      "$comment3": "Optional. Omit `modes` to emit every mode in tokens.json. modeSelectors overrides the default :root[data-theme=\"<mode>\"] selector per mode.",
+      "modeSelectors": { "dark": "[data-theme=\"dark\"]" },
+
+      "$comment2": "Optional. Rebuilds the semantic → primitive references that extraction flattens, so a theme can override one primitive and every semantic token follows. Links are inferred by matching values: ambiguous ones stay literals and are reported. Check `verify.mjs` prints a near-100% link rate before turning `strict` on. Remove this block to keep flat literals. See references/alias-linking.md.",
+      "aliasLinking": { "source": "primitive", "strict": false }
+    },
+    {
+      "type": "dtcg",
+      "out": "tokens",
+      "fileName": "tokens.dtcg.json"
+    }
+  ]
+}

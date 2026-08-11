@@ -1,0 +1,19 @@
+{
+  "name": "figma-token-export",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Figma design tokens -> tokens.json -> Flutter / Web / DTCG code. Zero runtime dependencies (Node 18+).",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "sync": "node sync.mjs",
+    "extract:mcp": "node normalize-mcp.mjs",
+    "extract:rest": "node fetch-rest.mjs",
+    "verify": "node verify.mjs",
+    "generate": "node generate.mjs",
+    "check": "node generate.mjs --check",
+    "selftest": "node selftest.mjs"
+  }
+}

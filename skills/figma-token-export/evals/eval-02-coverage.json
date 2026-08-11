@@ -1,0 +1,19 @@
+{
+  "id": "eval-02-coverage",
+  "skill": "figma-token-export",
+  "tests": "Step 2 · เงื่อนไขจบเรื่องความครบของ node",
+  "query": "ตรวจให้หน่อยว่า export ครบหรือยัง",
+  "files": [
+    "tokens.config.json ที่ figma.mcp.nodes มีแค่ 2 node ทั้งที่ไฟล์ Figma มีหน้า token 5 หน้า",
+    "tokens/tokens.json มี 615 color, 0 dimension, 0 typography",
+    "dumps/ มี color-primitive.json กับ color-semantic.json"
+  ],
+  "expected_behavior": [
+    "ตอบว่ายังไม่ครบ โดยอ้างหลักฐานว่า dimension กับ typography เป็น 0",
+    "list หน้าทั้งหมดในไฟล์ Figma ออกมาแล้วเทียบกับ dumps/ ทีละหน้า ไม่ใช่ดูแค่จำนวน token",
+    "ระบุชื่อหน้าที่ยังไม่มี dump ออกมาเป็นรายชื่อ",
+    "อธิบายว่าทำไมจำนวนสีที่ดูเยอะไม่ได้แปลว่าครบ — coverage เป็นราย node ไม่ใช่รายไฟล์",
+    "เสนอขั้นถัดไปเป็น node id ที่ต้องเพิ่ม ไม่ใช่ขอให้ผู้ใช้ไปหาเอง"
+  ],
+  "baseline_failure": "ดู 615 color แล้วตอบว่าดูครบดี หรือบอกว่า 'อาจจะยังขาด typography' โดยไม่ไปตรวจว่าไฟล์มีหน้าอะไรบ้าง"
+}
