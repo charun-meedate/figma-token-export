@@ -11,6 +11,10 @@ Figma ──extract──▶ tokens/tokens.json ──generate──▶ Flutter 
 `tokens.json` คือสัญญากลาง — commit ทั้งตัวมันและโค้ดที่ generate เพราะ diff ของ token
 คือสิ่งที่ดีไซเนอร์กับ dev รีวิวร่วมกันได้ ส่วน diff ของโค้ดคือหลักฐานว่าการเปลี่ยนแปลงลงจริง
 
+> ชื่อใน Figma ยังไม่ตรงมาตรฐาน? แก้ก่อน export — เพราะที่นี่ชื่อใน Figma กลายเป็นชื่อใน
+> โค้ดตรง ๆ [figma-rename](https://github.com/charun-meedate/figma-rename) ทำหน้าที่นั้น
+> แล้วส่งต่อมาที่ skill นี้
+
 ## อ่านไฟล์ไหนดี
 
 | คุณคือ | อ่าน |
