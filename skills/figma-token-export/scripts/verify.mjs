@@ -127,7 +127,12 @@ async function main() {
     });
     const scope = stats.filtered ? ` (${stats.kept} of ${stats.kept + stats.dropped} tokens)` : '';
     try {
-      GENERATORS[target.type](targetSet, { prefix: 'App', cssPrefix: '', dimensionUnit: 'px', sourceLabel: 'verify' });
+      // Pass the target's own Tailwind mode through: the v3 path has its own
+      // identifier space (flattened utility names) that only collides there.
+      GENERATORS[target.type](targetSet, {
+        prefix: 'App', cssPrefix: '', dimensionUnit: 'px', sourceLabel: 'verify',
+        tailwind: target.tailwind, colorFormat: target.colorFormat,
+      });
       console.log(`[verify] ${target.type}: identifiers OK${scope}`);
     } catch (err) {
       problems.push(`${target.type} codegen would fail: ${err.message}`);

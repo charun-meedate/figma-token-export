@@ -58,7 +58,7 @@ project's own README.
 
 | Command | What it does |
 |---|---|
-| `node "$S/selftest.mjs"` | whole pipeline against a fixture in a temp dir — 115 assertions |
+| `node "$S/selftest.mjs"` | whole pipeline against a fixture in a temp dir (see [Test status](#test-status)) |
 | `node "$S/normalize-mcp.mjs" dumps/*.json` | dumps → `tokens.json` |
 | `node "$S/verify.mjs"` | gate before generating; prints namespaces / layers / `other` |
 | `node "$S/generate.mjs"` | `tokens.json` → code |
@@ -114,7 +114,7 @@ reproducible.
 ```jsonc
 {
   "figma": {
-    "fileKey": "SjE7hLqGcKYLy4XMgXGhlM",        // the segment after /design/ in the URL
+    "fileKey": "kQ8mR2xJ7vNbL4wYtZcHpA",        // the segment after /design/ in the URL
     "mcp": { "nodes": ["96967:499", "0:1"] }
   },
   "tokensPath": "tokens/tokens.json",
@@ -190,9 +190,11 @@ claiming Flutter was verified when it had never been checked.
 
 | What | Status |
 |---|---|
-| `selftest.mjs` | 115 assertions, all passing |
+| `selftest.mjs` | 134 assertions, all passing |
 | Web (`tokens.ts`) | `tsc --strict` clean, against a 615-colour production set |
 | Flutter | `dart analyze` → `No issues found` (details below) |
+| Tailwind v4 | checked against a 225-token production design system — **byte-exact** |
+| Tailwind v3 | checked against a production `tailwind.config.js` — 40/41 utilities match |
 | DTCG | **never read by a downstream tool** |
 | alias linking | 261/261 linked, zero ambiguous, no dangling `var()` |
 
@@ -208,9 +210,29 @@ change showing up in the diff, and `--check` both in sync and after tampering.
 both paths added in v1.1.0: `AppShadows` (`List<BoxShadow>`) and
 `AppTypographyScale` (the class renamed because it collided with the text styles).
 
+**Tailwind v4** — generated from a production design system (225 semantic
+tokens) and compared with the team's hand-written `insure.css`: the
+`@theme inline` block matches **225/225**, and with `colorFormat: "hex"` the
+`:root` block is byte-identical on all 225 lines. Adopting the pipeline moves
+nothing on screen. Only 3 tokens differ — ones the project added itself that do
+not exist in Figma.
+
+**Tailwind v3** — generated from a production project's 42 tokens, then the
+`.cjs` file was `require`d and compared with its hand-written
+`theme.extend.colors`: **40 of 41** utilities match, values included. Eleven of
+them differ only in spelling, because the project uses `_` in its keys
+(`primary-soft_light`) where the generator uses `-` — adopting it renames those
+utilities in components, which is what `figma-rename` is for. The last one
+differs because the config key is spelled `grey` while the variable it points
+at is spelled `gray`.
+
 **DTCG** — the output matches the spec and passes the selftest assertions, but
 no downstream tool has actually read it. The first team to try it should report
 back.
+
+**Known, not fixed (v4)** — the mode override block writes a shadow root var
+that no v4 utility reads, since `@theme` carries the literal. v3 sidesteps this
+by pointing at the root var directly; v4 could adopt the same treatment later.
 
 **There is no agent-behaviour eval yet.** `selftest.mjs` tests that the *scripts*
 are correct; it does not test that the skill fires at the right moment or walks

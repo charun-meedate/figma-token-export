@@ -61,6 +61,10 @@ cd ~/dev/figma-token-export
 | **flutter** | `AppColors` · `AppSpacing` · `AppTypography` · `AppShadows` — `static const` ล้วน |
 | **dtcg** | JSON มาตรฐาน W3C สำหรับ Style Dictionary, Tokens Studio หรือ import กลับเข้า Figma |
 
+ถ้าโปรเจกต์ใช้ **Tailwind** จะถามเวอร์ชันด้วย เพราะ v3 กับ v4 สร้าง utility คนละทาง —
+v4 ได้บล็อก `@theme` ใน `tokens.css` ส่วน v3 ได้ไฟล์ `tokens.tailwind.cjs` ไป spread
+เข้า `tailwind.config.js` ตอบผิดแล้วจะได้ไฟล์ที่ไม่มี utility ออกมาเลยโดยไม่มี error
+
 **ข้อ 2 — จะเอา mode ไหนบ้าง** — ข้อนี้ถามทุกครั้ง ไม่มีข้าม
 
 | เลือก | ผลที่ตามมา |

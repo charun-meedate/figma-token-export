@@ -47,6 +47,12 @@
       "remBase": 16,
       "react": false,
       "typographyClasses": true,
+
+      "$comment4": "Tailwind: the MAJOR version, not a boolean. 4 appends @theme blocks to tokens.css; 3 writes tokens.tailwind.cjs to spread into theme.extend. Emitting the wrong major produces no utilities and no error, so this is refused rather than guessed. Omit it for a project that does not use Tailwind.",
+      "tailwind": 4,
+
+      "$comment5": "How a colour with alpha is spelled: \"rgb\" (default, CSS Color 4) or \"hex\" (8-digit). Use \"hex\" when adopting the pipeline in a project whose CSS is already written that way, so the first diff shows only real changes.",
+      "colorFormat": "rgb",
       "exclude": ["**/deprecated/**"],
 
       "$comment3": "Optional. Omit `modes` to emit every mode in tokens.json. modeSelectors overrides the default :root[data-theme=\"<mode>\"] selector per mode.",

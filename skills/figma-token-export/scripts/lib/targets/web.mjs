@@ -24,11 +24,19 @@ function header(target, style = 'block') {
     : `/* ${lines.join('\n   ')} */\n`;
 }
 
-/** #RRGGBBAA -> #RRGGBB when fully opaque, otherwise a browser-safe rgb()/alpha form. */
-function cssColor(hex8) {
+/**
+ * #RRGGBBAA -> #RRGGBB when fully opaque, otherwise a form carrying the alpha.
+ *
+ * The default is `rgb(r g b / a)` — CSS Color 4 syntax, readable in a diff.
+ * `colorFormat: "hex"` keeps 8-digit hex instead, which is what a project
+ * already written that way needs: adopting this pipeline should show a diff of
+ * real value changes, not 57 lines of the same colours respelled.
+ */
+function cssColor(hex8, target) {
   const rgb = hex8.slice(1, 7);
   const alpha = hex8.slice(7, 9).toUpperCase();
   if (alpha === 'FF' || alpha === '') return `#${rgb.toLowerCase()}`;
+  if (target?.colorFormat === 'hex') return `#${rgb.toLowerCase()}${alpha.toLowerCase()}`;
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(rgb.slice(i, i + 2), 16));
   const a = Number((parseInt(alpha, 16) / 255).toFixed(3));
   return `rgb(${r} ${g} ${b} / ${a})`;
@@ -45,6 +53,128 @@ function cssLength(value, target) {
 
 function varName(name, target) {
   return `--${target.cssPrefix ?? ''}${toKebab(name)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Tailwind
+//
+// `tailwind: 4` and `tailwind: 3` solve the same problem through different
+// mechanisms, which is why the option carries the major version rather than a
+// boolean: emitting v4 syntax into a v3 project produces no utilities and no
+// error, and that silent half-working state is the one this pipeline refuses.
+//
+// In Tailwind v4 a custom property in `:root` produces no utility class. What
+// creates `bg-surface-primary` is a variable in a `@theme` block, under one of
+// Tailwind's namespaces (`--color-*`, `--spacing-*`, `--radius-*`, `--text-*`,
+// `--shadow-*`). So a token file that stops at `:root` leaves a Tailwind
+// project hand-maintaining a second list — the exact two-source split this
+// pipeline exists to remove.
+//
+// Colours and shadows go through `@theme inline` pointing at the `:root` var,
+// which is what keeps them themeable: the utility resolves to `var(--…)`, so a
+// `.dark` block overriding that var reaches every utility built on it.
+// Dimensions and text styles are written straight into `@theme` — nothing
+// re-themes a spacing scale at runtime, and the indirection would only add a
+// hop.
+// ---------------------------------------------------------------------------
+
+/** Tailwind's namespace for a token, or null when it has no utility to generate. */
+function tailwindNamespace(group, name) {
+  if (group === 'color') return 'color';
+  if (group === 'shadow') return 'shadow';
+  if (group === 'typography') return 'text';
+  const first = name.split('/')[0].toLowerCase();
+  if (first === 'spacing' || first === 'space' || first === 'size') return 'spacing';
+  if (first === 'radius' || first === 'corner') return 'radius';
+  return null;
+}
+
+/**
+ * The leading segment when it just repeats the Tailwind namespace, else null.
+ *
+ * Accepts the plural too: design systems in the wild name the collection both
+ * `color/…` and `colors/…`, and a namespace that only matched one spelling
+ * would silently emit `--color-colors-primary-default`.
+ */
+function repeatedNamespace(kebab, ns) {
+  for (const prefix of [`${ns}-`, `${ns}s-`]) {
+    if (kebab.startsWith(prefix)) return prefix;
+  }
+  return null;
+}
+
+/** Tailwind's variable for a token: `--color-surface-primary`, never `--color-color-…`. */
+function tailwindVar(ns, name, target) {
+  const kebab = `${target.cssPrefix ?? ''}${toKebab(name)}`;
+  const repeat = repeatedNamespace(kebab, ns);
+  return repeat ? `--${ns}-${kebab.slice(repeat.length)}` : `--${ns}-${kebab}`;
+}
+
+/**
+ * The `:root` variable a themeable token is declared as.
+ *
+ * The leading segment that repeats the Tailwind namespace is dropped, so
+ * `color/surface/primary` is declared `--surface-primary` and its utility
+ * variable is `--color-surface-primary`. Without that, the two would be the
+ * same name and `@theme inline` would point a variable at itself. The segment
+ * stays when dropping it would leave a name too thin to read alone.
+ */
+function themeRootVar(name, ns, target) {
+  const kebab = `${target.cssPrefix ?? ''}${toKebab(name)}`;
+  const repeat = repeatedNamespace(kebab, ns);
+  const stripped = repeat ? kebab.slice(repeat.length) : kebab;
+  return repeat && stripped.includes('-') ? `--${stripped}` : `--${kebab}`;
+}
+
+/**
+ * The custom property a token is declared as. Identical to `varName` unless
+ * Tailwind mode strips a namespace-repeating segment, and both the CSS and the
+ * TypeScript mirror go through here so they can never disagree.
+ */
+function rootVar(name, group, target) {
+  if (!target.tailwind) return varName(name, target);
+  if (group !== 'color') return varName(name, target);
+  return themeRootVar(name, 'color', target);
+}
+
+function tailwindBlock(set, target) {
+  const inline = [];
+  const direct = [];
+
+  for (const name of Object.keys(set.color)) {
+    inline.push(`  ${tailwindVar('color', name, target)}: var(${rootVar(name, 'color', target)});`);
+  }
+  // Shadows carry their colour as `var(--…)` already, so the literal stays
+  // themeable without a second hop — and a `--shadow-*` root var would collide
+  // with the utility variable of the same name.
+  for (const [name, token] of Object.entries(set.shadow ?? {})) {
+    direct.push(`  ${tailwindVar('shadow', name, target)}: ${cssShadow(token, set, target)};`);
+  }
+
+  for (const [name, token] of Object.entries(set.dimension)) {
+    const ns = tailwindNamespace('dimension', name);
+    if (!ns) continue;
+    direct.push(`  ${tailwindVar(ns, name, target)}: ${cssLength(token.$value, target)};`);
+  }
+  for (const [name, token] of Object.entries(set.typography)) {
+    const v = token.$value;
+    if (v.fontSize == null) continue;
+    const base = tailwindVar('text', name, target);
+    direct.push(`  ${base}: ${cssLength(v.fontSize, target)};`);
+    if (v.lineHeight != null && v.fontSize) {
+      direct.push(`  ${base}--line-height: ${Number((v.lineHeight / v.fontSize).toFixed(4))};`);
+    }
+    if (v.fontWeight) direct.push(`  ${base}--font-weight: ${v.fontWeight};`);
+  }
+
+  const out = [];
+  if (inline.length) {
+    out.push('', '/* Tailwind v4 — utilities for the themeable tokens above.', '   `inline` keeps the var() hop, so a theme block still reaches them. */', '@theme inline {', ...inline, '}');
+  }
+  if (direct.length) {
+    out.push('', '/* Tailwind v4 — scales, written straight in: nothing re-themes them. */', '@theme {', ...direct, '}');
+  }
+  return out;
 }
 
 /**
@@ -65,14 +195,153 @@ function cssShadow(token, set, target) {
     .map((layer) => {
       const color =
         layer.colorRef && set.color?.[layer.colorRef]
-          ? `var(${varName(layer.colorRef, target)})`
-          : cssColor(layer.color);
+          ? `var(${rootVar(layer.colorRef, 'color', target)})`
+          : cssColor(layer.color, target);
       const lengths = [layer.offsetX, layer.offsetY, layer.blur, layer.spread]
         .map((n) => cssLength(n, target))
         .join(' ');
       return `${layer.inset ? 'inset ' : ''}${lengths} ${color}`;
     })
     .join(', ');
+}
+
+// ---------------------------------------------------------------------------
+// Tailwind v3
+//
+// v3 has no `@theme`: utilities come from `theme.extend` in
+// `tailwind.config.js`. So the equivalent artefact is a generated JS module the
+// project spreads into its config — the same job the `@theme` block does for
+// v4, in the only place v3 will read it.
+//
+// Colours and shadows stay `var(--…)` references into `tokens.css`, so the CSS
+// file remains the one runtime source and a mode block still reaches every
+// utility built on it. Scales are literals: nothing re-themes a spacing ramp.
+// ---------------------------------------------------------------------------
+
+/** Tailwind namespace -> the `theme.extend` key that produces those utilities. */
+const V3_THEME_KEYS = {
+  color: 'colors',
+  shadow: 'boxShadow',
+  text: 'fontSize',
+  spacing: 'spacing',
+  radius: 'borderRadius',
+};
+
+/** The theme key for a token — `tailwindVar` without the leading `--<ns>-`. */
+function tailwindThemeKey(ns, name, target) {
+  return tailwindVar(ns, name, target).slice(ns.length + 3);
+}
+
+/**
+ * Colours nested by path segment, with a `default` leaf becoming `DEFAULT`.
+ *
+ * v3 flattens nested colour objects by joining keys with `-`, and maps
+ * `DEFAULT` to the bare key. So `color/primary/default` nested this way yields
+ * `bg-primary` — the utility a v3 project written by hand already uses. A flat
+ * `'primary-default'` key would rename it to `bg-primary-default` and break
+ * every component referencing it.
+ */
+function v3Colors(set, target) {
+  const root = {};
+  const flat = [];
+  for (const name of Object.keys(set.color)) {
+    // Nest on the token's own path, not on the flattened var name: a segment
+    // like `gray-light` is one level, and splitting the kebab would invent two.
+    const path = name.split('/');
+    // Strip the namespace-repeating segment the same way the `:root` var does,
+    // so the utility name and the custom property read as one name.
+    const first = path[0].toLowerCase();
+    const segments = ((first === 'color' || first === 'colors') && path.length > 2 ? path.slice(1) : path).map((s) => toKebab(s));
+    const leaf = segments.at(-1) === 'default' ? 'DEFAULT' : segments.at(-1);
+    const branch = segments.slice(0, -1);
+
+    let node = root;
+    for (const segment of branch) {
+      if (typeof node[segment] === 'string') {
+        // A token sits where a group needs to be: keep the value as the
+        // group's DEFAULT rather than dropping either of them.
+        node[segment] = { DEFAULT: node[segment] };
+      }
+      node[segment] ??= {};
+      node = node[segment];
+    }
+    const value = `var(${rootVar(name, 'color', target)})`;
+    if (typeof node[leaf] === 'object' && node[leaf] !== null) node[leaf].DEFAULT = value;
+    else node[leaf] = value;
+
+    flat.push([name, [...branch, leaf === 'DEFAULT' ? '' : leaf].filter(Boolean).join('-')]);
+  }
+  // v3 resolves the nesting to these names; a collision here is two tokens
+  // fighting over one utility, which must fail before it reaches disk.
+  assertUniqueIdentifiers(flat, 'Tailwind v3 colour utilities');
+  return root;
+}
+
+/** Stable JS literal — sorted-free (insertion order is the token order), 2-space indent. */
+function jsValue(value, indent = '  ') {
+  if (Array.isArray(value)) return `[${value.map((v) => jsValue(v, indent)).join(', ')}]`;
+  if (value && typeof value === 'object') {
+    const inner = `${indent}  `;
+    const body = Object.entries(value)
+      .map(([k, v]) => `${inner}${/^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k)}: ${jsValue(v, inner)},`)
+      .join('\n');
+    return `{\n${body}\n${indent}}`;
+  }
+  return typeof value === 'number' ? String(value) : JSON.stringify(value);
+}
+
+function generateTailwindV3(set, target) {
+  const theme = {};
+  const colors = v3Colors(set, target);
+  if (Object.keys(colors).length) theme[V3_THEME_KEYS.color] = colors;
+
+  const put = (ns, key, value) => {
+    theme[V3_THEME_KEYS[ns]] ??= {};
+    theme[V3_THEME_KEYS[ns]][key] = value;
+  };
+
+  for (const [name, token] of Object.entries(set.shadow ?? {})) {
+    // A var() into `:root`, unlike v4's literal — v4 writes literals only
+    // because a `--shadow-*` root var would collide with its utility variable,
+    // and a JS key cannot collide with a CSS variable. The indirection is free
+    // here, and it makes a mode block's shadow override reach the utility.
+    put('shadow', tailwindThemeKey('shadow', name, target), `var(${varName(name, target)})`);
+  }
+  for (const [name, token] of Object.entries(set.dimension)) {
+    const ns = tailwindNamespace('dimension', name);
+    if (!ns) continue;
+    put(ns, tailwindThemeKey(ns, name, target), cssLength(token.$value, target));
+  }
+  for (const [name, token] of Object.entries(set.typography)) {
+    const v = token.$value;
+    if (v.fontSize == null) continue;
+    const extras = {};
+    if (v.lineHeight != null) extras.lineHeight = cssLength(v.lineHeight, target);
+    if (v.fontWeight) extras.fontWeight = v.fontWeight;
+    if (v.letterSpacing) extras.letterSpacing = cssLength(v.letterSpacing, target);
+    const size = cssLength(v.fontSize, target);
+    put('text', tailwindThemeKey('text', name, target), Object.keys(extras).length ? [size, extras] : [size]);
+  }
+
+  const notes = [
+    '',
+    '// Spread this into `theme.extend` in tailwind.config.js:',
+    '//   const tokens = require("./tokens.tailwind.cjs");',
+    '//   module.exports = { theme: { extend: { ...tokens } } };',
+    '//',
+    '// Colours and shadows are var() references into tokens.css — that file stays',
+    '// the one runtime source, so a theme block re-themes every utility here.',
+    '//',
+    '// fontFamily is deliberately absent: a v3 fontSize entry cannot carry it, and',
+    '// font loading belongs to the project. The whole text style, family included,',
+    '// is available as the generated utility class in tokens.css.',
+    '',
+  ];
+
+  return {
+    file: 'tokens.tailwind.cjs',
+    contents: `${header(target, 'line')}${notes.join('\n')}module.exports = ${jsValue(theme, '')};\n`,
+  };
 }
 
 function generateCss(set, target) {
@@ -90,25 +359,33 @@ function generateCss(set, target) {
       // primitive in a theme reaches every semantic token built on it —
       // the structure Figma has and a flat literal throws away.
       const aliasOf = target.aliasMap?.get(name);
-      const value = aliasOf ? `var(${varName(aliasOf, target)})` : cssColor(token.$value);
-      const trailer = aliasOf ? `  /* ${cssColor(token.$value)} */` : '';
-      return `  ${varName(name, target)}: ${value};${trailer}`;
+      const value = aliasOf ? `var(${rootVar(aliasOf, 'color', target)})` : cssColor(token.$value, target);
+      const trailer = aliasOf ? `  /* ${cssColor(token.$value, target)} */` : '';
+      return `  ${rootVar(name, 'color', target)}: ${value};${trailer}`;
     }),
   );
 
-  for (const [ns, group] of groupByNamespace(set.dimension)) {
-    section(
-      ns,
-      Object.entries(group).map(([name, token]) => `  ${varName(name, target)}: ${cssLength(token.$value, target)};`),
-    );
+  // Under v4 the scales are declared in `@theme` instead, which emits the same
+  // custom properties itself — repeating them here would be two declarations of
+  // one token. v3 has no `@theme`, so they stay here and the generated JS
+  // module points at them.
+  if (target.tailwind !== 4) {
+    for (const [ns, group] of groupByNamespace(set.dimension)) {
+      section(
+        ns,
+        Object.entries(group).map(([name, token]) => `  ${varName(name, target)}: ${cssLength(token.$value, target)};`),
+      );
+    }
   }
 
-  section(
-    'Shadow',
-    Object.entries(set.shadow ?? {}).map(
-      ([name, token]) => `  ${varName(name, target)}: ${cssShadow(token, set, target)};`,
-    ),
-  );
+  if (target.tailwind !== 4) {
+    section(
+      'Shadow',
+      Object.entries(set.shadow ?? {}).map(
+        ([name, token]) => `  ${varName(name, target)}: ${cssShadow(token, set, target)};`,
+      ),
+    );
+  }
 
   const typographyLines = [];
   for (const [name, token] of Object.entries(set.typography)) {
@@ -144,10 +421,10 @@ function generateCss(set, target) {
         const aliasOf = aliasMap?.get(name);
         const value =
           group === 'color'
-            ? (aliasOf ? `var(${varName(aliasOf, target)})` : cssColor(token.$value))
+            ? (aliasOf ? `var(${rootVar(aliasOf, 'color', target)})` : cssColor(token.$value, target))
             : cssLength(token.$value, target);
-        const trailer = aliasOf ? `  /* ${cssColor(token.$value)} */` : '';
-        body.push(`  ${varName(name, target)}: ${value};${trailer}`);
+        const trailer = aliasOf ? `  /* ${cssColor(token.$value, target)} */` : '';
+        body.push(`  ${rootVar(name, group, target)}: ${value};${trailer}`);
       }
     }
     if (!body.length) continue;
@@ -169,6 +446,8 @@ function generateCss(set, target) {
   if (utilities.length && target.typographyClasses !== false) {
     lines.push('', ...utilities, '');
   }
+
+  if (target.tailwind === 4) lines.push(...tailwindBlock(set, target));
 
   return { file: 'tokens.css', contents: lines.join('\n') };
 }
@@ -213,12 +492,12 @@ function generateTs(set, target) {
 
   blocks.push(`/** Literal colour values, \`#rrggbb\` or \`rgb(r g b / a)\`. */
 export const color = {
-${tsObject(colorPairs.map(([name, id]) => [id, JSON.stringify(cssColor(set.color[name].$value))]))}
+${tsObject(colorPairs.map(([name, id]) => [id, JSON.stringify(cssColor(set.color[name].$value, target))]))}
 } as const;
 
 /** The same colours as \`var(--…)\` references — prefer these in components. */
 export const colorVar = {
-${tsObject(colorPairs.map(([name, id]) => [id, JSON.stringify(`var(${varName(name, target)})`)]))}
+${tsObject(colorPairs.map(([name, id]) => [id, JSON.stringify(`var(${rootVar(name, 'color', target)})`)]))}
 } as const;
 
 export type ColorToken = keyof typeof color;`);
@@ -248,7 +527,7 @@ ${tsObject(shadowPairs.map(([name, id]) => [id, JSON.stringify(cssShadowLiteral(
 
 /** The same shadows as \`var(--…)\` references — prefer these in components. */
 export const boxShadowVar = {
-${tsObject(shadowPairs.map(([name, id]) => [id, JSON.stringify(`var(${varName(name, target)})`)]))}
+${tsObject(shadowPairs.map(([name, id]) => [id, JSON.stringify(`var(${target.tailwind === 4 ? tailwindVar('shadow', name, target) : varName(name, target)})`)]))}
 } as const;
 
 export type BoxShadowToken = keyof typeof boxShadow;`);
@@ -282,5 +561,7 @@ export type TypographyToken = keyof typeof typography;`);
 }
 
 export function generateWeb(set, target) {
-  return [generateCss(set, target), generateTs(set, target)];
+  const files = [generateCss(set, target), generateTs(set, target)];
+  if (target.tailwind === 3) files.push(generateTailwindV3(set, target));
+  return files;
 }

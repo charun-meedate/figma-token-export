@@ -85,6 +85,26 @@ export async function loadConfig(explicitPath) {
           errors.push(`targets[${i}].modeSelectors only applies to the web target ("${target.type}" has no CSS selectors).`);
         }
       }
+      if (target.tailwind !== undefined) {
+        // The major version, not a boolean: v3 and v4 need entirely different
+        // output, and v4 syntax in a v3 project generates no utilities and no
+        // error — a half-working state nobody would think to look for.
+        if (target.tailwind !== 3 && target.tailwind !== 4) {
+          errors.push(
+            `targets[${i}].tailwind must be 3 or 4 — the two majors need different output ` +
+              '(4: @theme blocks in tokens.css; 3: tokens.tailwind.cjs for theme.extend).',
+          );
+        } else if (target.type !== 'web') {
+          errors.push(`targets[${i}].tailwind only applies to the web target ("${target.type}" emits no CSS or Tailwind config).`);
+        }
+      }
+      if (target.colorFormat !== undefined) {
+        if (!['hex', 'rgb'].includes(target.colorFormat)) {
+          errors.push(`targets[${i}].colorFormat must be "hex" or "rgb" (default), not ${JSON.stringify(target.colorFormat)}.`);
+        } else if (target.type !== 'web') {
+          errors.push(`targets[${i}].colorFormat only applies to the web target ("${target.type}" has its own colour syntax).`);
+        }
+      }
       // A layer name that is not defined would silently select nothing —
       // catch the typo here rather than shipping an empty token file.
       for (const layer of target.layers ?? []) {

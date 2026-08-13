@@ -6,6 +6,8 @@
 - Output
 - Which one to use where
 - Theming
+- Tailwind
+- `colorFormat` — matching a project that already exists
 - `cssPrefix` — when it earns its keep
 - Colour format
 - Type checking
@@ -83,6 +85,8 @@ Options:
 | `remBase` | denominator for `rem`, default 16 |
 | `react` | `true` adds `satisfies Record<string, React.CSSProperties>` and the type import |
 | `typographyClasses` | `false` omits the utility classes, vars only |
+| `tailwind` | `4` adds `@theme` blocks to `tokens.css`; `3` adds `tokens.tailwind.cjs` for `theme.extend` |
+| `colorFormat` | `"rgb"` (default) or `"hex"` — how a colour with alpha is spelled |
 
 ## Which one to use where
 
@@ -118,6 +122,68 @@ not here.
 
 For a second extracted mode, generate `tokens.dark.json` into its own `out`
 and wrap the result in the theme selector rather than hand-maintaining values.
+
+## Tailwind
+
+A custom property in `:root` produces no Tailwind utility. Without this option
+the project keeps a second, hand-written list mapping every token to a theme
+entry — the two-source split this pipeline exists to remove. **The option
+carries the major version**, because the two majors need entirely different
+output and emitting the wrong one produces no utilities *and no error*.
+
+**`tailwind: 4`** appends two blocks to `tokens.css`:
+
+```css
+:root            { --surface-primary: #e50913; }
+@theme inline    { --color-surface-primary: var(--surface-primary); }  /* themeable */
+@theme           { --spacing-md: 16px; --shadow-md: 0 8px 24px -4px …; }
+```
+
+Colours keep the `var()` hop so a mode block still reaches every utility built
+on them. Scales go in directly — nothing re-themes a spacing ramp, and `@theme`
+emits the custom properties itself, so repeating them in `:root` would be two
+declarations of one token.
+
+**`tailwind: 3`** adds `tokens.tailwind.cjs` instead, since v3 builds utilities
+from the config file:
+
+```js
+// tailwind.config.js — hand-written
+const tokens = require('./src/tokens/tokens.tailwind.cjs');
+module.exports = { theme: { extend: { ...tokens } } };
+```
+
+`.cjs` because it has to load from both worlds: a CommonJS config can `require`
+it, an ESM or TS config can `import` it. The reverse is not true.
+
+Colours nest by token path with a `default` leaf becoming `DEFAULT`, because v3
+flattens nested colour objects and maps `DEFAULT` to the bare key — so
+`color/primary/default` yields `bg-primary`, not `bg-primary-default`. A
+leading `color/` or `colors/` segment is dropped once, leaving the utility name
+equal to the custom property it points at.
+
+Four things this deliberately does not do:
+
+- **Opacity modifiers do not compose.** `bg-primary/50` needs a colour in
+  channel form; a `var()` value cannot provide one. Keeping the var is worth
+  more than the modifier — freezing values to regain it would cost the theming.
+- **`fontFamily` is not emitted.** A v3 `fontSize` entry cannot carry it, and
+  font loading belongs to the project. The whole text style, family included,
+  is the generated utility class in `tokens.css`.
+- **A token named `spacing/8` shadows Tailwind's own `8`.** That is the design
+  system taking ownership of its scale, but it is worth knowing before `p-8`
+  changes meaning.
+- **v3 and v4 name colours differently on purpose** — `bg-primary` under v3
+  (matching what v3 projects already write), `bg-primary-default` under v4
+  (matching v4's own convention). Migrating between majors renames utilities.
+
+## `colorFormat` — matching a project that already exists
+
+The default spells a colour with alpha as `rgb(0 0 0 / 0.027)`. A project whose
+CSS is written as `#00000007` will diff on every one of those lines even though
+nothing changed. `colorFormat: "hex"` keeps 8-digit hex, so adopting the
+pipeline shows only the values that genuinely moved. Opaque colours are
+`#rrggbb` either way.
 
 ## `cssPrefix` — when it earns its keep
 

@@ -10,7 +10,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -531,6 +531,97 @@ async function main() {
 
   const tynsDart = await fs.readFile(path.join(dir, 'tynsdart/dimensions.g.dart'), 'utf8');
   check('Dart renames the colliding dimension class too', tynsDart.includes('abstract final class TnTypographyScale'), firstMatch(tynsDart, /abstract final class \w+/));
+
+  console.log('[selftest] tailwind');
+  // One config, both majors, over the token file the run already normalized —
+  // v3 and v4 must produce the same utility names from the same tokens.
+  const twConfig = path.join(dir, 'tw.config.json');
+  await fs.writeFile(
+    twConfig,
+    JSON.stringify({
+      figma: { fileKey: 'SELFTESTFILEKEY0000000' },
+      tokensPath: 'tokens/tokens.json',
+      targets: [
+        { type: 'web', out: 'tw3web', tailwind: 3, typographyClasses: false },
+        { type: 'web', out: 'tw4web', tailwind: 4, typographyClasses: false },
+        { type: 'web', out: 'twhex', colorFormat: 'hex' },
+      ],
+    }),
+  );
+  const twGen = await run('node', [path.join(SCRIPTS, 'generate.mjs'), '--config', twConfig]);
+  process.stdout.write(indent(twGen.stdout));
+
+  // Load it the way a tailwind.config.js would, to prove the module parses.
+  const tw = (await import(pathToFileURL(path.join(dir, 'tw3web/tokens.tailwind.cjs')).href)).default;
+  check('v3 emits a loadable CommonJS module', tw && typeof tw.colors === 'object');
+  check(
+    'v3 nests colours so a `default` leaf becomes the bare utility',
+    tw.colors?.text?.primary?.DEFAULT === 'var(--text-primary-default)',
+    JSON.stringify(tw.colors?.text),
+  );
+  check(
+    'v3 strips the repeated namespace once, matching the root var',
+    tw.colors?.mono?.['black-10'] === 'var(--mono-black-10)',
+    JSON.stringify(tw.colors?.mono),
+  );
+  check(
+    'v3 fontSize uses the object form with px line-height and weight',
+    JSON.stringify(tw.fontSize?.['body-lg-bold']) === JSON.stringify(['16px', { lineHeight: '22px', fontWeight: 700 }]),
+    JSON.stringify(tw.fontSize?.['body-lg-bold']),
+  );
+  check('v3 routes dimensions to the matching theme keys', tw.spacing?.['8'] === '8px' && tw.borderRadius?.['8'] === '8px', JSON.stringify({ s: tw.spacing, r: tw.borderRadius }));
+  check('v3 shadow points at the root var, so a theme block still reaches it', tw.boxShadow?.['elevation-md'] === 'var(--elevation-md)', JSON.stringify(tw.boxShadow));
+  check('v3 omits fontFamily rather than dropping it silently', !('fontFamily' in tw), Object.keys(tw).join(', '));
+
+  const tw3Css = await fs.readFile(path.join(dir, 'tw3web/tokens.css'), 'utf8');
+  check('v3 keeps scales and shadows in :root — it has no @theme', tw3Css.includes('--spacing-8: 8px;') && tw3Css.includes('--elevation-md:') && !tw3Css.includes('@theme'));
+  const tw3Ts = await fs.readFile(path.join(dir, 'tw3web/tokens.ts'), 'utf8');
+  check('v3 boxShadowVar points at the root var, not a @theme var', tw3Ts.includes('elevationMd: "var(--elevation-md)"'), firstMatch(tw3Ts, /elevationMd: "[^"]+"/));
+
+  const tw4Css = await fs.readFile(path.join(dir, 'tw4web/tokens.css'), 'utf8');
+  check(
+    'v4 maps utilities onto the root vars through @theme inline',
+    /@theme inline \{[\s\S]*--color-text-primary-default: var\(--text-primary-default\);/.test(tw4Css),
+    firstMatch(tw4Css, /--color-text-primary-default:[^;]*;/),
+  );
+  check(
+    'v4 puts scales in @theme, not in :root',
+    /@theme \{[\s\S]*--spacing-8: 8px;/.test(tw4Css) && !/:root \{[^}]*--spacing-8/.test(tw4Css),
+    firstMatch(tw4Css, /@theme \{[\s\S]{0,120}/),
+  );
+  check('v4 carries the line-height alongside the text size', tw4Css.includes('--text-body-lg-bold--line-height: 1.375;'), firstMatch(tw4Css, /--text-body-lg-bold[^;]*;/));
+
+  const hexCss = await fs.readFile(path.join(dir, 'twhex/tokens.css'), 'utf8');
+  check('colorFormat hex keeps 8-digit hex instead of rgb()', hexCss.includes('--color-mono-black-10: #0000001a;'), firstMatch(hexCss, /--color-mono-black-10:[^;]+;/));
+  check('colorFormat hex leaves opaque colours as 6-digit', hexCss.includes('--text-primary-default: #030712;'));
+
+  await run('node', [path.join(SCRIPTS, 'generate.mjs'), '--config', twConfig, '--check']);
+  check('--check covers the generated tailwind module', true);
+  await fs.rm(path.join(dir, 'tw3web/tokens.tailwind.cjs'));
+  let twCheckFailed = false;
+  try {
+    await run('node', [path.join(SCRIPTS, 'generate.mjs'), '--config', twConfig, '--check']);
+  } catch {
+    twCheckFailed = true;
+  }
+  check('deleting the tailwind module is drift, not silence', twCheckFailed);
+
+  const twRefusal = async (target) => {
+    const file = path.join(dir, 'tw-bad.config.json');
+    await fs.writeFile(
+      file,
+      JSON.stringify({ figma: { fileKey: 'SELFTESTFILEKEY0000000' }, tokensPath: 'tokens/tokens.json', targets: [target] }),
+    );
+    try {
+      await run('node', [path.join(SCRIPTS, 'generate.mjs'), '--config', file]);
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  check('`tailwind: true` is refused rather than guessed as a version', await twRefusal({ type: 'web', out: 'twbad', tailwind: true }));
+  check('tailwind on a non-web target is rejected', await twRefusal({ type: 'flutter', out: 'twbad', tailwind: 3 }));
+  check('an unknown colorFormat is rejected', await twRefusal({ type: 'web', out: 'twbad', colorFormat: 'oklch' }));
 
   console.log('[selftest] collision detection');
   await fs.writeFile(path.join(dir, 'collide.json'), JSON.stringify({ 'text/primary/default': '#111111', 'text/primary-default': '#222222' }));

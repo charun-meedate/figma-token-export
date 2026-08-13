@@ -70,7 +70,7 @@ node "$S/verify.mjs"     # ยังไม่มี config จะ error — แ�
 
 | คำสั่ง | ทำอะไร |
 |---|---|
-| `node "$S/selftest.mjs"` | รันทั้ง pipeline บน fixture ในโฟลเดอร์ชั่วคราว — 115 assertion |
+| `node "$S/selftest.mjs"` | รันทั้ง pipeline บน fixture ในโฟลเดอร์ชั่วคราว (ดู [สถานะการทดสอบ](#สถานะการทดสอบ)) |
 | `node "$S/normalize-mcp.mjs" dumps/*.json` | dump → `tokens.json` |
 | `node "$S/verify.mjs"` | ตรวจก่อน generate + พิมพ์ namespace / layer / `other` |
 | `node "$S/generate.mjs"` | `tokens.json` → โค้ด |
@@ -124,7 +124,7 @@ curl -s -H "X-Figma-Token: $FIGMA_ACCESS_TOKEN" \
 ```jsonc
 {
   "figma": {
-    "fileKey": "SjE7hLqGcKYLy4XMgXGhlM",        // ส่วนที่ตามหลัง /design/ ใน URL
+    "fileKey": "kQ8mR2xJ7vNbL4wYtZcHpA",        // ส่วนที่ตามหลัง /design/ ใน URL
     "mcp": { "nodes": ["96967:499", "0:1"] }
   },
   "tokensPath": "tokens/tokens.json",
@@ -195,9 +195,11 @@ curl -s -H "X-Figma-Token: $FIGMA_ACCESS_TOKEN" \
 
 | อะไร | สถานะ |
 |---|---|
-| `selftest.mjs` | 115 assertion ผ่านหมด |
+| `selftest.mjs` | 134 assertion ผ่านหมด |
 | Web (`tokens.ts`) | `tsc --strict` สะอาด บน token ชุด production 615 สี |
 | Flutter | `dart analyze` → `No issues found` (ดูรายละเอียดข้างล่าง) |
+| Tailwind v4 | ตรวจกับ design system production 225 token — **ตรง byte ทุกบรรทัด** |
+| Tailwind v3 | ตรวจกับ `tailwind.config.js` production — utility 40/41 ตรง (ดูข้างล่าง) |
 | DTCG | **ยังไม่เคยให้ tool ปลายทางอ่านจริง** |
 | alias linking | 261/261 เชื่อมได้ ไม่มีกำกวม ไม่มี `var()` ลอย |
 
@@ -212,8 +214,24 @@ diff ที่เปลี่ยนเฉพาะ dark mode และ `--check`
 ครอบคลุมทั้งสองทางที่เพิ่มใน v1.1.0: `AppShadows` (`List<BoxShadow>`) และ
 `AppTypographyScale` (คลาสที่ถูกเปลี่ยนชื่อเพราะชนกับ text style)
 
+**Tailwind v4** — generate จาก design system production (225 semantic token) แล้ว
+เทียบกับ `insure.css` ที่ทีมเขียนมือ: บล็อก `@theme inline` ตรง **225/225** และ
+`:root` ตรงแบบ byte ทั้ง 225 บรรทัดเมื่อใช้ `colorFormat: "hex"` — เปลี่ยนมาใช้
+pipeline ได้โดยหน้าจอไม่ขยับ ต่างแค่ 3 token ที่โปรเจกต์เพิ่มเองและไม่มีใน Figma
+
+**Tailwind v3** — generate จาก token 42 ตัวของโปรเจกต์ production แล้ว `require()`
+ไฟล์ `.cjs` เทียบกับ `theme.extend.colors` ที่เขียนมือ: utility **40 จาก 41 ตรง**
+รวมทั้งค่าที่ชี้ (`var(--…)` ตัวเดียวกัน) — โดย 11 ตัวต่างกันแค่การสะกด
+เพราะโปรเจกต์ใช้ `_` ในคีย์ (`primary-soft_light`) ส่วนที่ generate ใช้ `-`
+การเปลี่ยนมาใช้จึงต้อง rename utility ในคอมโพเนนต์ (งานของ `figma-rename`)
+อีก 1 ตัวไม่ตรงเพราะคีย์ในคอนฟิกสะกด `grey` แต่ตัวแปรที่ชี้สะกด `gray`
+
 **DTCG** — ผลลัพธ์ตรงตาม spec และผ่าน assertion ใน selftest แต่ยังไม่มีใครเอาไป
 ให้ Style Dictionary หรือ Tokens Studio อ่านจริง ทีมแรกที่ใช้ช่วยรายงานกลับด้วย
+
+**ค้างไว้ (v4)** — บล็อก mode override เขียน root var ของ shadow ที่ไม่มี utility
+ไหนอ่าน เพราะ `@theme` ถือ literal อยู่แล้ว ฝั่ง v3 ไม่มีปัญหานี้เพราะชี้ root var
+ตรง ๆ ถ้าจะแก้ v4 ให้ใช้วิธีเดียวกัน ทำได้แต่ยังไม่จำเป็น
 
 **ยังไม่มี eval ระดับพฤติกรรม agent** — `selftest.mjs` ทดสอบว่า*สคริปต์*ทำงานถูก
 ไม่ได้ทดสอบว่า skill ถูกเรียกถูกจังหวะและเดินครบทุกขั้น เป็นคนละเรื่องกัน
