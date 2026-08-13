@@ -22,7 +22,7 @@
 
 ## ต่างจาก `selftest.mjs` ยังไง
 
-`selftest.mjs` ทดสอบว่า **สคริปต์** ทำงานถูก — 115 assertion บน colour
+`selftest.mjs` ทดสอบว่า **สคริปต์** ทำงานถูก — assertion บน colour
 normalization, การ resolve composite, identifier collision, rollback ฯลฯ
 รันได้ในเครื่องเปล่า ไม่ต้องมี Figma
 

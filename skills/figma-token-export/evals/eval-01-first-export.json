@@ -2,7 +2,7 @@
   "id": "eval-01-first-export",
   "skill": "figma-token-export",
   "tests": "Step 0–4 · ตั้งโปรเจกต์ใหม่ตั้งแต่ศูนย์",
-  "query": "export token ให้หน่อย https://www.figma.com/design/SjE7hLqGcKYLy4XMgXGhlM/-VD--Design-system----Rizzup--Copy-?node-id=59-862",
+  "query": "export token ให้หน่อย https://www.figma.com/design/kQ8mR2xJ7vNbL4wYtZcHpA/Design-system?node-id=59-862",
   "files": [
     "โปรเจกต์เปล่า ไม่มี tokens.config.json",
     "ลิงก์ที่ให้ชี้ไปหน้า cover (node 59:862) ซึ่งไม่มี variable ผูกอยู่เลย",

@@ -40,7 +40,7 @@ Open Claude Code in the project and type something like this, **with the Figma
 link**:
 
 > Pull the design tokens from this file into the project, as CSS + TypeScript.
-> https://www.figma.com/design/SjE7hLqGcKYLy4XMgXGhlM/Design-system?node-id=59-862
+> https://www.figma.com/design/kQ8mR2xJ7vNbL4wYtZcHpA/Design-system?node-id=59-862
 
 Say which output you want: **CSS + TypeScript** (web) · **Dart** (Flutter) ·
 **standard JSON** (for other tooling, or to import back into Figma).

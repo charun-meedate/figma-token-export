@@ -37,7 +37,7 @@ git clone <url-ของ-repo-นี้> ~/dev/design-tokens-skill
 เปิด Claude Code ในโปรเจกต์ แล้วพิมพ์ประมาณนี้ **พร้อมแปะลิงก์ Figma**:
 
 > เอา design token จากไฟล์นี้มาใส่โปรเจกต์ให้หน่อย เป็น CSS + TypeScript
-> https://www.figma.com/design/SjE7hLqGcKYLy4XMgXGhlM/Design-system?node-id=59-862
+> https://www.figma.com/design/kQ8mR2xJ7vNbL4wYtZcHpA/Design-system?node-id=59-862
 
 บอกด้วยว่าปลายทางเป็นอะไร: **CSS + TypeScript** (เว็บ) · **Dart** (Flutter) ·
 **JSON มาตรฐาน** (ส่งต่อ tool อื่น หรือ import กลับเข้า Figma)
