@@ -61,6 +61,7 @@ project's own README.
 | `node "$S/selftest.mjs"` | whole pipeline against a fixture in a temp dir (see [Test status](#test-status)) |
 | `node "$S/normalize-mcp.mjs" dumps/*.json` | dumps → `tokens.json` |
 | `node "$S/verify.mjs"` | gate before generating; prints namespaces / layers / `other` |
+| `node "$S/audit.mjs" <file...>` | read what a project declares by hand and measure it against `tokens.json` |
 | `node "$S/generate.mjs"` | `tokens.json` → code |
 | `node "$S/generate.mjs" --check` | exits 1 if committed code ≠ tokens.json (**put this in CI**) |
 | `node "$S/sync.mjs" dumps/*.json` | all of the above plus the diff (the everyday command) |

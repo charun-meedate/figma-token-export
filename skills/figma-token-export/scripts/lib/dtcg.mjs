@@ -66,6 +66,26 @@ export function normalizeHex(input) {
     return `#${[r, g, b, a].map(hex2).join('').toUpperCase()}`;
   }
 
+  // hsl() shows up in hand-written project CSS rather than in Figma output, so
+  // it is here for `audit.mjs` to read what a project already declares.
+  const hsla = value.match(/^hsla?\(([^)]+)\)$/i);
+  if (hsla) {
+    const parts = hsla[1].split(/[,\s/]+/).filter(Boolean);
+    const h = ((Number.parseFloat(parts[0]) % 360) + 360) % 360;
+    const s = Number.parseFloat(parts[1]) / 100;
+    const l = Number.parseFloat(parts[2]) / 100;
+    if ([h, s, l].some((n) => !Number.isFinite(n))) return null;
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = l - c / 2;
+    const [r1, g1, b1] = [
+      [c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x],
+    ][Math.floor(h / 60) % 6];
+    const raw = parts[3];
+    const a = raw === undefined ? 255 : clampByte(Number.parseFloat(raw) * (String(raw).includes('%') ? 2.55 : 255));
+    return `#${[r1, g1, b1].map((v) => hex2(clampByte((v + m) * 255))).join('')}${hex2(a)}`.toUpperCase();
+  }
+
   value = value.replace('#', '').toUpperCase();
   if (value.length === 3) value = value.split('').map((c) => c + c).join('');
   if (value.length === 4) value = value.split('').map((c) => c + c).join('');

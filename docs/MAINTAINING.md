@@ -73,6 +73,7 @@ node "$S/verify.mjs"     # ยังไม่มี config จะ error — แ�
 | `node "$S/selftest.mjs"` | รันทั้ง pipeline บน fixture ในโฟลเดอร์ชั่วคราว (ดู [สถานะการทดสอบ](#สถานะการทดสอบ)) |
 | `node "$S/normalize-mcp.mjs" dumps/*.json` | dump → `tokens.json` |
 | `node "$S/verify.mjs"` | ตรวจก่อน generate + พิมพ์ namespace / layer / `other` |
+| `node "$S/audit.mjs" <ไฟล์...>` | อ่าน token ที่โปรเจกต์เขียนเอง แล้วเทียบกับ `tokens.json` |
 | `node "$S/generate.mjs"` | `tokens.json` → โค้ด |
 | `node "$S/generate.mjs" --check` | exit 1 ถ้าโค้ดที่ commit ไม่ตรงกับ tokens.json (**ใส่ใน CI**) |
 | `node "$S/sync.mjs" dumps/*.json` | 4 ตัวบนรวมกัน + พิมพ์ diff (คำสั่งประจำวัน) |

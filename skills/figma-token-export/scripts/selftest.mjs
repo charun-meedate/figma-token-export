@@ -623,6 +623,50 @@ async function main() {
   check('tailwind on a non-web target is rejected', await twRefusal({ type: 'flutter', out: 'twbad', tailwind: 3 }));
   check('an unknown colorFormat is rejected', await twRefusal({ type: 'web', out: 'twbad', colorFormat: 'oklch' }));
 
+  console.log('[selftest] audit');
+  // One fixture per bucket the report has, so a bucket that stops working is a
+  // failure here rather than a quietly missing line in someone's report.
+  await fs.writeFile(
+    path.join(dir, 'audit-fixture.css'),
+    `:root {
+  --text-primary-default: #030712;        /* matches by name and value */
+  --text-secondary-default: #ff0000;      /* the token exists, the value drifted */
+  --brand-accent: #123456;                /* in neither name nor value */
+  --renamed-black: hsl(0, 0%, 0%);        /* right value, different name */
+  --surface: oklch(0.5 0.1 200);          /* cannot be compared */
+}`,
+  );
+  await fs.writeFile(
+    path.join(dir, 'audit-fixture.dart'),
+    `class AppColors {
+  static const Color textPrimaryDefault = Color(0xFF030712);
+  static const Color mystery = Color(0xFF00FF00);
+}`,
+  );
+  const audit = await run('node', [
+    path.join(SCRIPTS, 'audit.mjs'),
+    path.join(dir, 'audit-fixture.css'),
+    path.join(dir, 'audit-fixture.dart'),
+    '--config', config,
+  ]);
+  process.stdout.write(indent(audit.stdout));
+  const auditOut = audit.stdout;
+  check('audit reads CSS custom properties and Dart Color() alike', /audit-fixture\.css: 5 declaration\(s\)/.test(auditOut) && /audit-fixture\.dart: 2 declaration\(s\)/.test(auditOut));
+  check('audit counts a name+value agreement as matched', /matched\s+3\b/.test(auditOut), firstMatch(auditOut, /matched\s+\d+/));
+  check('audit reports a drifted value with both sides', auditOut.includes('code=#FF0000FF') && auditOut.includes('figma=#6A7282FF'), firstMatch(auditOut, /~ .*text-secondary-default.*/));
+  check('audit separates the right value under a different name', /renamed-black.*→\s+color\/mono\/black/.test(auditOut), firstMatch(auditOut, /= .*renamed-black.*/));
+  check('audit lists what the design system does not have', /✗ .*brand-accent\s+#123456FF/.test(auditOut), firstMatch(auditOut, /✗ .*/));
+  check('audit refuses to compare oklch rather than guessing', /\?\s+.*--surface\s+oklch/.test(auditOut), firstMatch(auditOut, /\?\s+.*/));
+  check('audit reports, it does not gate', audit.stdout.length > 0);
+
+  let auditStrictFailed = false;
+  try {
+    await run('node', [path.join(SCRIPTS, 'audit.mjs'), path.join(dir, 'audit-fixture.css'), '--config', config, '--strict']);
+  } catch {
+    auditStrictFailed = true;
+  }
+  check('--strict turns drift into a failed run', auditStrictFailed);
+
   console.log('[selftest] collision detection');
   await fs.writeFile(path.join(dir, 'collide.json'), JSON.stringify({ 'text/primary/default': '#111111', 'text/primary-default': '#222222' }));
   let collisionCaught = false;

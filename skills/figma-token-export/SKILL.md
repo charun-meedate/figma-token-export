@@ -35,6 +35,7 @@ Deeper detail lives in `./references/`, loaded on demand:
 | [`references/modes.md`](references/modes.md) | light/dark and other modes — ask the user first |
 | [`references/layers.md`](references/layers.md) | exporting only primitives / semantics / components |
 | [`references/alias-linking.md`](references/alias-linking.md) | restoring semantic → primitive references |
+| [`references/audit.md`](references/audit.md) | adopting the pipeline in a project that already has tokens by hand |
 | [`references/tokens-schema.md`](references/tokens-schema.md) | the token file contract, and adding a new target |
 | [`references/target-flutter.md`](references/target-flutter.md), [`references/target-web.md`](references/target-web.md) | output shape and how to wire it into an app |
 

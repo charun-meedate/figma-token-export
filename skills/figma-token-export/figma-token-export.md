@@ -456,9 +456,7 @@ wiring references the generated symbols rather than restating their values.
   `TextStyle(height:)` silently produces enormous line spacing.
 - **Alpha belongs in the stored value.** `tokens.json` always stores
   `#RRGGBBAA` so no target has to guess. Figma's per-fill `opacity` is folded
-  in during REST extraction.
-- **A `0` dimension needs no unit in CSS** but still needs `0.0` in Dart.
-  Both generators handle it; a hand-written shortcut will not.
+  in during REST extraction, and `colorFormat` decides how a target spells it.
 - **Fix the source, then regenerate.** If generated output is wrong, the bug is
   in a generator or in `tokens.json`. A fix edited into the output survives
   only until the next `generate`.
@@ -477,16 +475,16 @@ wiring references the generated symbols rather than restating their values.
 
 ```bash
 node "$S/selftest.mjs"          # the scripts still work
+node "$S/audit.mjs" <file...>   # what a project already declares, vs tokens.json
 ```
 
-Run it after touching anything in `scripts/`. What it covers, and the two
-production files it was validated against — including the one where alias
-linking correctly refuses on 125 of 129 tokens — are recorded once, in the
-project's `docs/MAINTAINING.md` under test status.
+Run the selftest after touching anything in `scripts/`; what it covers is
+recorded once in the project's `docs/MAINTAINING.md`. `evals/` holds the other
+half — three behaviour tests checking whether this process actually gets
+walked, which passing the selftest says nothing about. Run both.
 
-`evals/` holds the other half: three behaviour tests that check whether this
-process actually gets walked. Passing the selftest says nothing about whether
-the modes question was asked. Run both.
+`audit.mjs` is for adopting the pipeline where tokens already exist by hand:
+`references/audit.md`.
 
 ## Reference files
 
@@ -495,6 +493,7 @@ the modes question was asked. Run both.
 - `references/modes.md` — light/dark and other modes: asking, extracting per mode, theme output
 - `references/layers.md` — exporting one layer (primitive/semantic/component), Figma collections, glob syntax
 - `references/alias-linking.md` — restoring semantic → primitive references that extraction flattens
+- `references/audit.md` — measuring a project's hand-written tokens against `tokens.json`
 - `references/tokens-schema.md` — the `tokens.json` contract, and how to add a target
 - `references/target-flutter.md` — output shape and wiring into `ThemeExtension`
 - `references/target-web.md` — CSS var strategy, theming, TypeScript usage
