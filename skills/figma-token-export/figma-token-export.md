@@ -22,6 +22,24 @@
 Each step ends with a **Done when** line. Those are the gate between steps: a
 step whose condition is not met is not finished, however good the output looks.
 
+Copy this into your reply on a first setup and tick as you go. A checklist you
+can see is what stops a verification step from being skipped — the one failure
+this pipeline keeps producing is a run that reports success while a whole page
+of tokens was never extracted.
+
+```
+Progress:
+- [ ] 0 · extraction path chosen, and one get_variable_defs call proves the session works
+- [ ] 1 · config written · target picked · MODES ANSWERED BY THE USER
+- [ ] 2 · every page in the file accounted for — REST page list compared against dumps/
+- [ ] 3 · verify.mjs exits 0 · every `other` entry read and sorted — if not, back to 2
+- [ ] 4 · generated · `--check` exits 0 · compiled where a toolchain exists — if not, back to 3
+- [ ] 5 · project README records $S, fileKey, and the node id per dump
+```
+
+Steps 3 and 4 are loops, not gates you pass once: fix what the checker reports,
+run it again, and only move on when it comes back clean.
+
 The pipeline is three separable steps with one contract between them:
 
 ```
@@ -458,27 +476,17 @@ wiring references the generated symbols rather than restating their values.
 ## Verifying the pipeline itself
 
 ```bash
-node "$S/selftest.mjs"
+node "$S/selftest.mjs"          # the scripts still work
 ```
 
-Runs the whole chain against a fixture in a temp directory and asserts on real
-output — colour normalization, `Font(...)` resolution, identifier collisions,
-per-namespace splitting, layer selection, alias linking (including the
-ambiguous and strict cases), and that `--check` both passes when in sync and
-fails when tampered with. Run it after touching anything in `scripts/`.
+Run it after touching anything in `scripts/`. What it covers, and the two
+production files it was validated against — including the one where alias
+linking correctly refuses on 125 of 129 tokens — are recorded once, in the
+project's `docs/MAINTAINING.md` under test status.
 
-Validated against two production Figma files:
-
-- 511 colours / 37 dimensions / 33 text styles — `dart analyze` clean,
-  `tsc --strict` clean, no identifier collisions. Alias linking there reports
-  **4 linked, 125 ambiguous**, because that palette defines the same value
-  under several names — the correct answer is to leave `aliasLinking` off.
-- 615 colours across a primitive and a semantic collection — **261 of 261**
-  semantic colours linked with zero ambiguity, no dangling `var()`, and every
-  reference chain resolving back to the value in `tokens.json`.
-
-The gap between those two numbers is the whole reason alias linking refuses
-rather than guesses.
+`evals/` holds the other half: three behaviour tests that check whether this
+process actually gets walked. Passing the selftest says nothing about whether
+the modes question was asked. Run both.
 
 ## Reference files
 
