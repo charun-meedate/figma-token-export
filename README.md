@@ -13,7 +13,8 @@ Figma ──extract──▶ tokens/tokens.json ──generate──▶ Flutter 
 
 > ชื่อใน Figma ยังไม่ตรงมาตรฐาน? แก้ก่อน export — เพราะที่นี่ชื่อใน Figma กลายเป็นชื่อใน
 > โค้ดตรง ๆ [figma-rename](https://github.com/charun-meedate/figma-rename) ทำหน้าที่นั้น
-> แล้วส่งต่อมาที่ skill นี้
+> แล้วส่งต่อมาที่ skill นี้ (ถ้าโปรเจกต์ไม่ได้ใช้ Figma เป็นต้นทาง skill นั้นทำงานได้เองเลย
+> โดยไม่ต้องมาถึงขั้น export)
 
 ## ในหน้านี้
 
